@@ -21,6 +21,7 @@ docs/DECISION_LOG/0000-template.md
 execution_docs/_active/planning.md
 execution_docs/_active/execution.md
 scripts/check-archive-renames.sh
+scripts/setup-hooks.sh
 .github/workflows/scaffold-ci.yml
 .github/workflows/deploy-template.yml
 .husky/pre-push

@@ -32,11 +32,6 @@ has_substantial_content() {
     return 1
   fi
 
-  # Skip untouched templates
-  if grep -q "^## Task: \\[New Task Name\\]$\\|^## Task: \\[Task Name\\]$" "$file"; then
-    return 1
-  fi
-
   if grep -q "✅ Completed\|🔄 In Progress\|### Completed Tasks" "$file"; then
     return 0
   fi

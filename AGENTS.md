@@ -19,8 +19,9 @@ Before non-trivial work:
 1. Read `docs/SYSTEM_LANDSCAPE.md`, `docs/DOMAIN_LOGIC.md`, and `docs/DATA_DICTIONARY.md`.
 2. Confirm assumptions and service boundaries are documented.
 3. Confirm idempotency/replay behavior for mutating paths.
-4. Run `./scripts/verify-scaffold.sh`.
-5. Keep active docs updated:
+4. Ensure hooks are installed once per clone with `./scripts/setup-hooks.sh`.
+5. Run `./scripts/verify-scaffold.sh`.
+6. Keep active docs updated:
    - `execution_docs/_active/planning.md`
    - `execution_docs/_active/execution.md`
 

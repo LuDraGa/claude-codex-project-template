@@ -91,6 +91,7 @@ See [docs/CODE_SEARCH.md](docs/CODE_SEARCH.md) for more examples.
 ## Quick Commands
 
 ```bash
+./scripts/setup-hooks.sh
 ./scripts/verify-scaffold.sh
 ./scripts/check-archive-renames.sh
 ```
