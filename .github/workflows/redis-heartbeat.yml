@@ -1,0 +1,66 @@
+name: Redis Heartbeat
+
+on:
+  schedule:
+    # Weekly (~every 7 days) to prevent Upstash free-tier inactivity archival.
+    - cron: '0 0 * * 0'
+  workflow_dispatch:
+
+jobs:
+  heartbeat:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+
+    steps:
+      - name: Validate secrets
+        env:
+          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          if [ -z "${UPSTASH_REDIS_REST_URL:-}" ]; then
+            echo "::error::UPSTASH_REDIS_REST_URL secret is required"
+            exit 1
+          fi
+
+          if [ -z "${UPSTASH_REDIS_REST_TOKEN:-}" ]; then
+            echo "::error::UPSTASH_REDIS_REST_TOKEN secret is required"
+            exit 1
+          fi
+
+      - name: Write heartbeat key
+        env:
+          UPSTASH_REDIS_REST_URL: ${{ secrets.UPSTASH_REDIS_REST_URL }}
+          UPSTASH_REDIS_REST_TOKEN: ${{ secrets.UPSTASH_REDIS_REST_TOKEN }}
+        run: |
+          set -euo pipefail
+
+          BASE_URL="${UPSTASH_REDIS_REST_URL%/}"
+          HEARTBEAT_KEY="system_heartbeat"
+          HEARTBEAT_VALUE="$(date -u +%s)"
+          # 15 days TTL keeps key available long enough while still refreshed weekly.
+          HEARTBEAT_TTL_SECONDS=1296000
+
+          response=$(curl -sS \
+            "${BASE_URL}/set/${HEARTBEAT_KEY}/${HEARTBEAT_VALUE}?EX=${HEARTBEAT_TTL_SECONDS}" \
+            -H "Authorization: Bearer ${UPSTASH_REDIS_REST_TOKEN}" \
+            -w "\nHTTP_CODE:%{http_code}")
+
+          http_code=$(echo "$response" | awk -F: '/HTTP_CODE/{print $2}')
+          body=$(echo "$response" | sed '/HTTP_CODE/d')
+
+          echo "Response: $body"
+          echo "HTTP Status: $http_code"
+
+          if [ "$http_code" != "200" ]; then
+            echo "::error::Redis heartbeat failed with HTTP ${http_code}"
+            exit 1
+          fi
+
+          if ! echo "$body" | grep -q '"result"'; then
+            echo "::error::Unexpected heartbeat response body"
+            exit 1
+          fi
+
+          echo "::notice::Redis heartbeat successful"

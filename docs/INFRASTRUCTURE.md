@@ -113,6 +113,10 @@ Document runtime, deployment, and environment assumptions for deterministic oper
 - Outbox consumption uses concurrent workers with `FOR UPDATE SKIP LOCKED`.
 - Lease key scope is `org_id` with 10-minute TTL and 20% refill watermark.
 - Rate and config data should be cached in memory with short TTL.
+- Redis command budget posture (Upstash free-tier aware):
+  - No high-frequency Redis polling loops in workers.
+  - Redis operations are request/event driven (`reserve`, `creditBack`, `refillToTarget`).
+  - Heartbeat is weekly and single-command via GitHub Actions.
 
 ## Currency Expansion Posture
 

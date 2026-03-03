@@ -27,6 +27,15 @@ Runbook for deploy, rollback, incident handling, and reconciliation in the billi
 3. Verify `.github/workflows/supabase-heartbeat.yml` runs every 12 hours.
 4. On heartbeat failure, validate key validity and API URL first, then inspect project pause status.
 
+## Redis Heartbeat Runbook (Upstash)
+
+1. Configure GitHub Action secrets:
+   - `UPSTASH_REDIS_REST_URL`
+   - `UPSTASH_REDIS_REST_TOKEN`
+2. Verify `.github/workflows/redis-heartbeat.yml` runs weekly (~every 7 days).
+3. Workflow writes one key (`system_heartbeat`) with TTL using a single Redis `SET` command.
+4. If Redis connect failures mention archival/inactivity, unarchive in Upstash console and rerun workflow.
+
 ## Rollback Checklist
 
 1. Freeze high-risk write paths if financial integrity is uncertain.
@@ -59,6 +68,7 @@ Cadence: hourly.
 2. Trigger refill when lease remaining <= 20%.
 3. Refill only if ledger-derived balance can cover target lease.
 4. If refill repeatedly fails, switch org to temporary debit rejection and raise incident.
+5. Keep refill/event loops event-driven; do not add high-frequency Redis polling (command budget protection).
 
 ## Emergency Integrity Mode
 

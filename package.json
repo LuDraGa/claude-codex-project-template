@@ -4,6 +4,7 @@
   "version": "0.1.0",
   "description": "Virtual credits + metering + billing foundation",
   "dependencies": {
+    "ioredis": "^5.10.0",
     "pg": "^8.16.3"
   },
   "scripts": {
