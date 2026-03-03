@@ -19,15 +19,31 @@ function evaluateWebhookReplay({ existingReceipt, incomingPayload }) {
 function createCashfreeWebhookService({ verifySignature, receiptRepository, ledgerService }) {
   return {
     async processWebhook({ headers, rawBody, payload, orgId, idempotencyKey }) {
-      const verified = await verifySignature({ headers, rawBody });
-      if (!verified) {
+      const verification = await verifySignature({ headers, rawBody });
+      if (!verification || verification.verified === false) {
         throw new DomainError('invalid webhook signature', 'INVALID_WEBHOOK_SIGNATURE');
+      }
+
+      const providerEventId = idempotencyKey || verification.idempotencyHeader;
+      if (!providerEventId) {
+        throw new DomainError('missing provider event id for webhook idempotency', 'MISSING_PROVIDER_EVENT_ID');
+      }
+
+      if (idempotencyKey && verification.idempotencyHeader && idempotencyKey !== verification.idempotencyHeader) {
+        throw new DomainError(
+          'cashfree webhook conflict: payload payment id differs from idempotency header',
+          'WEBHOOK_IDEMPOTENCY_CONFLICT',
+          {
+            payloadPaymentId: idempotencyKey,
+            idempotencyHeader: verification.idempotencyHeader
+          }
+        );
       }
 
       const existing = await receiptRepository.findByProviderEventId({
         orgId,
         provider: 'cashfree',
-        providerEventId: idempotencyKey
+        providerEventId
       });
 
       const replayDecision = evaluateWebhookReplay({
@@ -42,7 +58,7 @@ function createCashfreeWebhookService({ verifySignature, receiptRepository, ledg
       await receiptRepository.create({
         orgId,
         provider: 'cashfree',
-        providerEventId: idempotencyKey,
+        providerEventId,
         payloadHash: hashPayload(payload),
         status: 'VERIFIED'
       });
@@ -52,7 +68,7 @@ function createCashfreeWebhookService({ verifySignature, receiptRepository, ledg
           orgId,
           userId: payload.user_id,
           packageCode: payload.package_code,
-          idempotencyKey: `topup:${idempotencyKey}`,
+          idempotencyKey: `topup:${providerEventId}`,
           metadata: payload
         });
       }
