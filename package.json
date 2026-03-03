@@ -8,6 +8,6 @@
   },
   "scripts": {
     "verify:scaffold": "./scripts/verify-scaffold.sh",
-    "test": "node --test $(find apps packages -type f -name \"*.test.js\" | sort)"
+    "test": "node --test $(find apps packages workers -type f -name \"*.test.js\" | sort)"
   }
 }
