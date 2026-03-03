@@ -1,6 +1,3 @@
-#!/usr/bin/env sh
-. "$(dirname -- "$0")/_/husky.sh"
-
 # Post-commit hook to archive planning and execution documents.
 # This preserves session history while resetting active templates.
 
@@ -29,6 +26,11 @@ has_substantial_content() {
 
   lines=$(wc -l < "$file")
   if [ "$lines" -lt "$min_lines" ]; then
+    return 1
+  fi
+
+  # Skip untouched templates; avoids archiving on every commit.
+  if grep -q "^## Task: \\[New Task Name\\]$\\|^## Task: \\[Task Name\\]$" "$file"; then
     return 1
   fi
 

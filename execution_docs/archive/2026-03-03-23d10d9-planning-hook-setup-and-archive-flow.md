@@ -1,3 +1,9 @@
+---
+**Commit**: 23d10d9
+**Date**: 2026-03-03 12:58:35
+**Message**: chore: enable and document husky archive workflow
+---
+
 # Project - Active Planning
 
 ## Task: [New Task Name]
@@ -20,7 +26,7 @@
 *Document important decisions made during planning*
 
 ### Dependencies & Considerations
-*Note any dependencies, constraints, or special considerations*
+*Note dependencies, constraints, or special considerations*
 
 ### Success Criteria
 *How do we know this task is complete?*
