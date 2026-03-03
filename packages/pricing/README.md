@@ -13,6 +13,7 @@ Static versioned pricing source for v1.
 - Conversion is fixed: `1 credit = 1_000_000 credits_micros`.
 - Pricing/package changes must be config-only edits; no code changes.
 - In v1, only `INR` is active.
+- `llm_pricing.minimum_request_micros` defines pre-call lease fallback debit when caller-provided request debit is missing/invalid.
 
 ## Workflow
 

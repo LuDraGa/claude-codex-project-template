@@ -59,6 +59,18 @@ function validateRateCatalog(config) {
     throw new DomainError('rate catalog must define default_rate_id', 'INVALID_RATE_CONFIG');
   }
 
+  for (const rate of config.rates) {
+    const minimumRequestMicros = rate?.llm_pricing?.minimum_request_micros;
+    if (minimumRequestMicros !== undefined) {
+      if (!Number.isInteger(minimumRequestMicros) || minimumRequestMicros <= 0) {
+        throw new DomainError(
+          `minimum_request_micros must be a positive integer for rate ${rate.rate_id || 'unknown'}`,
+          'INVALID_RATE_CONFIG'
+        );
+      }
+    }
+  }
+
   return config;
 }
 

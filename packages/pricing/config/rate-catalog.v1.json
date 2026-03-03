@@ -10,6 +10,7 @@
       "is_active": true,
       "notes": "Static config in v1. Move to DB-backed catalog in phase 2.",
       "llm_pricing": {
+        "minimum_request_micros": 1000,
         "default_input_token_micros": 0,
         "default_output_token_micros": 0,
         "model_overrides": {}
