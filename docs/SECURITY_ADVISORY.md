@@ -32,6 +32,7 @@ Define security controls for payment handling, credit mutations, and tenant-isol
 - Cashfree webhook:
   - Validate signature with configured webhook secret.
   - Validate timestamp/tolerance if supplied by provider.
+  - For webhook version `>= 2025-01-01`, require idempotency header and enforce header/payload payment-id consistency.
   - Persist receipt record and dedupe by provider event id.
   - If same provider event id arrives with different payload/status, hard-fail and raise incident.
 - LiteLLM callback/event ingestion:

@@ -11,6 +11,7 @@ Define canonical tables and event contracts for financial and usage flows.
 - Currency and payment amount are captured only in package/payment entities.
 - Phase 1 active settlement currency is INR.
 - Each org wallet has exactly one settlement currency.
+- Rate config for hook admission includes `llm_pricing.minimum_request_micros` fallback.
 
 ## Entity: `credit_ledger`
 
@@ -54,6 +55,7 @@ Constraints:
 - Unique index: `(idempotency_key)`
 - Check: `attempts >= 0`
 - Retry policy: 5s, 30s, 2m, 10m, 30m up to 8 attempts
+- `attempts` increments when consumer claims row (`PROCESSING` transition)
 
 ## Entity: `credit_leases` (optional visibility table)
 
@@ -187,10 +189,15 @@ Constraints:
 Conventions:
 
 - `run_id` and `step_id` are gateway-generated.
+- Idempotency key patterns:
+  - LLM step: `run_id:step_id`
+  - Tool step: `run_id:step_id:tool:tool_name`
+  - Tool refund: `run_id:step_id:tool:tool_name:refund`
 - Lago event code mapping:
   - `LLM` -> `llm_usage_step`
   - `TOOL` -> `tool_usage_step`
   - `REFUND` adjustments -> `refund_step`
+- Refund semantics in v1 are represented via `metadata.is_refund=true` (or `metadata.lago_event_code=refund_step`) while keeping `kind=TOOL`.
 
 ## Derived Projections
 

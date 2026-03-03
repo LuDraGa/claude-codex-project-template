@@ -32,10 +32,11 @@ Rules:
 
 ### `LeaseStore` (Redis)
 
-- `reserve(org_id, amount_micros, lease_context) -> {approved, remaining_micros, lease_id}`
-- `credit_back(org_id, amount_micros, lease_id) -> {remaining_micros}`
-- `get(org_id) -> {remaining_micros, expires_at}`
-- `refill(org_id, target_micros, reason) -> {remaining_micros, expires_at}`
+- `reserve({orgId, amountMicros}) -> {approved, remainingMicros, leaseId}`
+- `creditBack({orgId, amountMicros}) -> {remainingMicros}`
+- `get({orgId}) -> {remainingMicros, expiresAt}`
+- `refillToTarget({orgId, targetMicros}) -> {remainingMicros}`
+- `isBelowLowWatermark({remainingMicros, targetMicros}) -> boolean`
 
 Rules:
 
@@ -48,12 +49,39 @@ Rules:
 
 ### `UsageEmitter` (LiteLLM hook -> outbox)
 
-- `emit_usage_event(event: UsageEvent) -> {outbox_id}`
+- `emitUsageEvent(event: UsageEvent) -> {outboxId, inserted}`
 
 Rules:
 
 - Must be idempotent by `idempotency_key`.
 - Provider raw DTOs must not be persisted directly.
+
+### `LiteLLMHookHandlers` (gateway chokepoint)
+
+- `preCallHook({metadata, requestDebitMicros}) -> {metadata}`
+- `postCallHook({metadata, usage}) -> {outboxId, usageEvent}`
+- `mcpPostHook({metadata, tool}) -> {usageEvent, refundEvent?}`
+
+Rules:
+
+- `preCallHook` performs lease-only debit admission using Redis.
+- `preCallHook` uses caller-provided `request_debit_micros` first; if missing/invalid/non-positive, falls back to `llm_pricing.minimum_request_micros` from locked `rate_id`.
+- `postCallHook` computes actual LLM cost from tokens + locked `rate_id`.
+- Lease differences are reconciled in Redis (credit-back or additional debit).
+- `mcpPostHook` debits tool cost and emits refund event on tool failure.
+
+### `OutboxConsumer` (Modal worker)
+
+- `claimBatch({limit}) -> pendingRows[]`
+- `processBatch({limit}) -> {claimed, sent, retried, failed}`
+
+Rules:
+
+- Use `FOR UPDATE SKIP LOCKED`.
+- Multiple consumers allowed.
+- Rows move to `PROCESSING` and increment `attempts` at claim time.
+- Retry schedule: 5s, 30s, 2m, 10m, 30m with max 8 attempts.
+- Mark row `FAILED` and raise incident after retry exhaustion.
 
 ### `LedgerService` (worker)
 
@@ -68,7 +96,7 @@ Rules:
 
 ### `BillingAdapter` (Lago)
 
-- `send_usage(event) -> {provider_event_id}`
+- `sendUsage({eventCode, transactionId, customerExternalId, usageEvent}) -> {ok}`
 - `upsert_customer_for_org(org_id) -> {lago_customer_id}`
 
 Rules:
@@ -84,7 +112,7 @@ Rules:
 
 ### `ObservabilityAdapter` (Langfuse)
 
-- `annotate_observation(trace_id, observation_id, credits_micros, rate_id, metadata)`
+- `annotateUsage({traceId, runId, stepId, creditsMicros, rateId, metadata})`
 
 Rules:
 
@@ -100,20 +128,9 @@ Rules:
 
 - Reject unverifiable signatures.
 - Enforce idempotent processing by payment id.
+- For Cashfree webhook versions >= `2025-01-01`, require idempotency header and ensure it matches payload payment id.
 - Same payment id with different payload or status is terminal conflict (hard-fail + incident).
 - Checkout conversion model is package-based only (no live FX conversion).
-
-### `OutboxConsumer` (Modal worker)
-
-- `claim_batch(limit) -> pending_rows[]`
-- `process_row(row) -> {status, attempts, next_retry_at}`
-
-Rules:
-
-- Use `FOR UPDATE SKIP LOCKED`.
-- Multiple consumers allowed.
-- Retry schedule: 5s, 30s, 2m, 10m, 30m with max 8 attempts.
-- Mark row `FAILED` and raise incident after retry exhaustion.
 
 ## Retry and Error Mapping
 

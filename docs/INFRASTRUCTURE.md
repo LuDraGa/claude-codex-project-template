@@ -13,10 +13,11 @@ Document runtime, deployment, and environment assumptions for deterministic oper
 - Cache/gating: Redis
 - Observability: Langfuse SaaS/self-hosted endpoint
 
-## Planned Repository Layout (v1)
+## Repository Layout (v1)
 
 - `apps/api` - Vercel API routes (wallet, topup webhook, auth-aware endpoints)
 - `apps/web` - Minimal wallet/balance UI
+- `workers/litellm-hooks` - LiteLLM pre/post/MCP hook handlers
 - `workers/outbox-consumer` - Modal consumer and retry scheduler
 - `workers/lease-refill` - Modal lease refill worker
 - `packages/domain` - canonical models, invariants, and errors

@@ -14,6 +14,9 @@
 - Remote Supabase schema and RLS/policy behavior are validated without Docker via direct `psql`.
 - Heartbeat strategy is implemented in codebase (RPC migration + GitHub scheduled workflow).
 - Remote Supabase now has migrations `20260303140000`, `20260303152000`, and `20260303190000` applied and validated.
+- Outbox consumer + adapter foundation has been implemented with automated tests.
+- LiteLLM hook scaffolding (pre/post/MCP) with static rate catalog costing and outbox emission is implemented with automated tests.
+- Runtime bootstrap layers are now in place for outbox consumer loop and LiteLLM hook context construction.
 
 ## Proposed Approach
 
@@ -31,6 +34,7 @@
 6. Strict fail-closed on Redis+DB outage.
 7. Lease-only debit strategy (no reserve-reconcile).
 8. Full tool refund on tool failure after debit.
+8.1. Pre-call debit source: caller-provided `request_debit_micros` with rate-config fallback minimum when missing/invalid/non-positive.
 9. `rate_id` lock at request start.
 10. Per-step Lago usage events.
 11. Cashfree credit mint only on terminal success.
@@ -103,22 +107,24 @@ Gate: API contract tests pass for auth, idempotency, and topup.
 
 ### Phase 3: LiteLLM metering + lease path
 
-1. Implement Redis lease adapter with TTL + low-watermark behavior.
+1. Implement Redis lease adapter with TTL + low-watermark behavior. (core adapter complete)
 2. Implement LiteLLM pre/post hooks and MCP post hook:
    - lease-only debit
    - gateway-generated run/step metadata
-   - canonical UsageEvent outbox insert.
-3. Implement compensation path for failed tool calls (`refund_step`).
+   - canonical UsageEvent outbox insert. (core hook scaffolding complete)
+3. Implement compensation path for failed tool calls (`refund_step`). (complete in hook scaffolding)
+4. Remaining: wire hooks into live LiteLLM runtime and production metadata contract.
 
 Gate: hook integration tests pass with deterministic idempotency.
 
 ### Phase 4: Outbox workers on Modal
 
-1. Implement concurrent outbox consumer with `FOR UPDATE SKIP LOCKED`.
-2. Add retry scheduler for 5s/30s/2m/10m/30m (max 8).
-3. Apply idempotent ledger mutations.
-4. Emit Lago events with per-step codes and `transaction_id=idempotency_key`.
-5. Update Langfuse observations with `credits_micros`, `rate_id`, tags.
+1. Implement concurrent outbox consumer with `FOR UPDATE SKIP LOCKED`. (core logic complete)
+2. Add retry scheduler for 5s/30s/2m/10m/30m (max 8). (complete)
+3. Apply idempotent ledger mutations. (complete)
+4. Emit Lago events with per-step codes and `transaction_id=idempotency_key`. (complete)
+5. Update Langfuse observations with `credits_micros`, `rate_id`, tags. (non-blocking adapter integration complete)
+6. Remaining: Modal deployment wiring/entrypoints and live provider credentials/config hardening.
 
 Gate: replay/idempotency tests pass; failed rows transition to `FAILED`.
 
@@ -139,6 +145,7 @@ Gate: end-to-end simulation passes (topup -> usage -> ledger -> Lago -> Langfuse
 - Need Supabase project and schema migration strategy.
 - Need initial static pricing config files checked in for version 1.
 - Need final phase 2 wiring into deployed Vercel route entrypoints.
+- Need LiteLLM hook implementation to start producing canonical outbox events from gateway traffic.
 
 ## Success Criteria
 
