@@ -1,0 +1,23 @@
+{
+  "version": "2026-03-03",
+  "phase": "v1",
+  "default_rate_id": "inr_v1_default",
+  "credit_micros_per_credit": 1000000,
+  "rates": [
+    {
+      "rate_id": "inr_v1_default",
+      "currency_code": "INR",
+      "is_active": true,
+      "notes": "Static config in v1. Move to DB-backed catalog in phase 2.",
+      "llm_pricing": {
+        "default_input_token_micros": 0,
+        "default_output_token_micros": 0,
+        "model_overrides": {}
+      },
+      "tool_pricing": {
+        "default_tool_call_micros": 0,
+        "tool_overrides": {}
+      }
+    }
+  ]
+}

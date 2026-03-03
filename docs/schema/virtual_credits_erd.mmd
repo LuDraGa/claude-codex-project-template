@@ -1,0 +1,126 @@
+erDiagram
+  ORG {
+    uuid id PK
+  }
+
+  APP_USER {
+    uuid id PK
+  }
+
+  ORG_WALLET_SETTINGS {
+    uuid org_id PK
+    text settlement_currency_code
+    timestamptz created_at
+    timestamptz updated_at
+  }
+
+  ORG_MEMBERSHIPS {
+    uuid id PK
+    uuid org_id FK
+    uuid user_id FK
+    org_role role
+    timestamptz created_at
+  }
+
+  CREDIT_PACKAGES {
+    uuid id PK
+    text code UK
+    text currency_code
+    bigint amount_minor
+    bigint credits_micros
+    boolean is_active
+    timestamptz created_at
+    timestamptz updated_at
+  }
+
+  CREDIT_LEDGER {
+    uuid id PK
+    uuid org_id FK
+    uuid user_id FK
+    bigint delta_micros
+    credit_ledger_type type
+    text idempotency_key
+    text run_id
+    text step_id
+    text trace_id
+    text rate_id
+    jsonb metadata
+    timestamptz created_at
+  }
+
+  USAGE_OUTBOX {
+    uuid id PK
+    text event_type
+    jsonb payload
+    text idempotency_key UK
+    usage_outbox_status status
+    int attempts
+    timestamptz next_retry_at
+    text last_error
+    timestamptz created_at
+    timestamptz updated_at
+  }
+
+  PAYMENT_WEBHOOK_RECEIPTS {
+    uuid id PK
+    uuid org_id FK
+    text provider
+    text provider_event_id
+    text payload_hash
+    payment_webhook_status status
+    timestamptz created_at
+  }
+
+  CREDIT_LEASES {
+    uuid org_id PK
+    bigint lease_micros
+    timestamptz expires_at
+    timestamptz updated_at
+  }
+
+  LAGO_CUSTOMERS {
+    uuid org_id PK
+    text lago_customer_id UK
+    timestamptz created_at
+    timestamptz updated_at
+  }
+
+  ADMIN_AUDIT_LOG {
+    uuid id PK
+    uuid actor_user_id FK
+    uuid org_id FK
+    text action
+    text target_type
+    text target_id
+    jsonb metadata
+    timestamptz created_at
+  }
+
+  ORG ||--|| ORG_WALLET_SETTINGS : has_settings
+  ORG ||--o{ ORG_MEMBERSHIPS : has_members
+  APP_USER ||--o{ ORG_MEMBERSHIPS : belongs_to
+
+  ORG ||--o{ CREDIT_LEDGER : posts_entries
+  APP_USER ||--o{ CREDIT_LEDGER : actor_nullable
+
+  ORG ||--o{ PAYMENT_WEBHOOK_RECEIPTS : receives
+  ORG ||--|| CREDIT_LEASES : has_lease
+  ORG ||--|| LAGO_CUSTOMERS : mapped_customer
+  ORG ||--o{ ADMIN_AUDIT_LOG : audited_access
+  APP_USER ||--o{ ADMIN_AUDIT_LOG : actor
+
+  ORG_WALLET_SETTINGS }o--o{ CREDIT_PACKAGES : currency_match
+
+  %% Visual distinction
+  %% Append-only tables: CREDIT_LEDGER, PAYMENT_WEBHOOK_RECEIPTS, ADMIN_AUDIT_LOG
+  style CREDIT_LEDGER fill:#fff4e5,stroke:#cc7a00,stroke-width:2px
+  style PAYMENT_WEBHOOK_RECEIPTS fill:#fff4e5,stroke:#cc7a00,stroke-width:2px
+  style ADMIN_AUDIT_LOG fill:#fff4e5,stroke:#cc7a00,stroke-width:2px
+
+  %% Mutable tables: ORG_WALLET_SETTINGS, ORG_MEMBERSHIPS, CREDIT_PACKAGES, USAGE_OUTBOX, CREDIT_LEASES, LAGO_CUSTOMERS
+  style ORG_WALLET_SETTINGS fill:#e8f5ff,stroke:#1f78b4,stroke-width:1px
+  style ORG_MEMBERSHIPS fill:#e8f5ff,stroke:#1f78b4,stroke-width:1px
+  style CREDIT_PACKAGES fill:#e8f5ff,stroke:#1f78b4,stroke-width:1px
+  style USAGE_OUTBOX fill:#e8f5ff,stroke:#1f78b4,stroke-width:1px
+  style CREDIT_LEASES fill:#e8f5ff,stroke:#1f78b4,stroke-width:1px
+  style LAGO_CUSTOMERS fill:#e8f5ff,stroke:#1f78b4,stroke-width:1px

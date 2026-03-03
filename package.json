@@ -1,0 +1,13 @@
+{
+  "name": "ai-credit-system",
+  "private": true,
+  "version": "0.1.0",
+  "description": "Virtual credits + metering + billing foundation",
+  "dependencies": {
+    "pg": "^8.16.3"
+  },
+  "scripts": {
+    "verify:scaffold": "./scripts/verify-scaffold.sh",
+    "test": "node --test $(find apps packages -type f -name \"*.test.js\" | sort)"
+  }
+}

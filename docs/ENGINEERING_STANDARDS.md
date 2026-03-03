@@ -2,39 +2,43 @@
 
 ## Purpose
 
-Define engineering conventions for consistent, maintainable agent- and human-authored code.
+Define implementation standards for a financially correct, replay-safe distributed billing system.
 
-## Tooling Patterns
+## Core Coding Rules
 
-- Prefer deterministic commands and scripts.
-- Keep module boundaries clear and cohesive.
-- Validate all untrusted input at boundaries.
+1. Use `credits_micros BIGINT` only for all credit math.
+2. Keep domain invariants in shared domain modules, not in adapters.
+3. Validate all inbound payloads at the boundary using explicit schemas.
+4. Use explicit, typed error classes for domain/integration/infrastructure failures.
 
-## Validation and Types
+## Mutation Path Requirements
 
-- Use explicit schema validation for inbound/outbound contracts.
-- Prefer strict typing and canonical model definitions.
-- Reject malformed or ambiguous payloads early.
+- Every mutating endpoint/job must require an idempotency key.
+- Any same-key/different-payload scenario must return conflict and alert.
+- Critical paths must not use silent catch-and-continue behavior.
 
-## Error Handling
+## Adapter Rules
 
-Use an explicit hierarchy:
-
-- Domain errors (business rule violations)
-- Integration errors (provider/network failures)
-- Infrastructure errors (storage/runtime failures)
-
-Never silently swallow exceptions in critical paths.
+- Provider DTOs remain inside adapter layer.
+- Adapter output must map to canonical internal models.
+- Adapter retries must be bounded and deterministic.
 
 ## Testing Requirements
 
-- Unit tests for core domain behavior.
-- Contract tests for adapter boundaries.
-- Integration tests for critical workflows.
-- Avoid live third-party dependency in default CI test paths.
+- Unit tests:
+  - ledger balance derivation
+  - debit/credit/refund invariants
+  - rate locking behavior
+- Contract tests:
+  - Cashfree webhook verification + idempotency
+  - Lago event emission with transaction id
+  - LiteLLM hook payload normalization
+- Integration tests:
+  - outbox retry and eventual convergence
+  - Redis lease + ledger consistency under retries
 
 ## Code Search Requirements
 
-- Use `rg` for text searches.
-- Use `ast-grep` for structural code searches and refactors.
-- See `docs/CODE_SEARCH.md` for patterns and examples.
+- Use `rg` for text search.
+- Use `ast-grep` for structural searches/refactors.
+- Keep search patterns in `docs/CODE_SEARCH.md` current when new modules are introduced.

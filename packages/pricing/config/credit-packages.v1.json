@@ -1,0 +1,40 @@
+{
+  "version": "2026-03-03",
+  "phase": "v1",
+  "active_settlement_currencies": ["INR"],
+  "credit_micros_per_credit": 1000000,
+  "packages": [
+    {
+      "code": "INR_199",
+      "currency_code": "INR",
+      "amount_minor": 19900,
+      "credits": 199,
+      "credits_micros": 199000000,
+      "is_active": true
+    },
+    {
+      "code": "INR_499",
+      "currency_code": "INR",
+      "amount_minor": 49900,
+      "credits": 525,
+      "credits_micros": 525000000,
+      "is_active": true
+    },
+    {
+      "code": "INR_999",
+      "currency_code": "INR",
+      "amount_minor": 99900,
+      "credits": 1100,
+      "credits_micros": 1100000000,
+      "is_active": true
+    },
+    {
+      "code": "INR_2499",
+      "currency_code": "INR",
+      "amount_minor": 249900,
+      "credits": 2900,
+      "credits_micros": 2900000000,
+      "is_active": true
+    }
+  ]
+}

@@ -1,94 +1,74 @@
 # CLAUDE.md
 
-This file provides core operating instructions for coding agents in this repository.
+This repository builds a production-grade virtual credit and billing substrate for LLM workloads.
 
-## Repository Purpose
+## Stack Baseline
 
-- Project-agnostic scaffold for agentic software projects.
-- Primary sources of truth:
-  - `docs/` for architecture, standards, and runbooks
-  - `execution_docs/` for active planning and execution tracking
+- API/Web: Vercel serverless routes
+- Worker/consumers: Modal
+- Auth + primary DB: Supabase (Postgres + Auth + RLS)
+- Low-latency credit gating: Redis leased credits
+- LLM metering chokepoint: LiteLLM hooks + MCP cost hooks
+- Billing ingestion: Lago usage events
+- Payments/topups: Cashfree webhooks
+- Observability: Langfuse traces/observations
+
+## Core Principle
+
+The append-only ledger in Postgres is the financial source of truth. Everything else (Redis lease state, Langfuse annotations, Lago usage) is either acceleration, reporting, or invoicing integration.
 
 ## Agent Rules
 
-### Priority Order
+## Mandatory Workflow
 
-1. Correctness and user intent
-2. Security and data protection
-3. Contract and interface stability
-4. Operational safety
-5. Developer ergonomics
+1. Read `docs/SYSTEM_LANDSCAPE.md`, `docs/DOMAIN_LOGIC.md`, `docs/DATA_DICTIONARY.md`.
+2. Run `./scripts/setup-hooks.sh` once per clone.
+3. Run `./scripts/verify-scaffold.sh` before and after non-trivial changes.
+4. Keep `execution_docs/_active/planning.md` and `execution_docs/_active/execution.md` updated during the session.
+5. For behavior changes, update docs in this order:
+   1. `docs/DOMAIN_LOGIC.md`
+   2. `docs/DATA_DICTIONARY.md`
+   3. `docs/INTEGRATION_CONTRACTS.md`
+   4. `docs/INFRASTRUCTURE.md` / `docs/SECURITY_ADVISORY.md` / `docs/OPERATIONAL_PLAYBOOK.md`
+   5. `docs/DECISION_LOG/*`
+6. Use `docs/CODE_SEARCH.md` as the search/refactor pattern reference.
 
-### Mandatory Pre-Flight Checks
+## Non-Negotiables
 
-Before non-trivial work:
+- Use `credits_micros BIGINT` only for monetary units.
+- Conversion is fixed: `1 credit = 1_000_000 credits_micros`.
+- Never implement silent partial failures on debit or topup mutation paths.
+- Enforce idempotency keys for all external callbacks and billable events.
+- Keep provider-specific DTOs isolated in adapter modules.
+- Fail closed for critical verification and integrity checks.
 
-1. Read `docs/SYSTEM_LANDSCAPE.md`, `docs/DOMAIN_LOGIC.md`, and `docs/DATA_DICTIONARY.md`.
-2. Confirm assumptions and boundaries are documented.
-3. Confirm idempotency/replay behavior for mutating paths.
-4. Run `./scripts/verify-scaffold.sh`.
-5. Keep active docs current:
-   - `execution_docs/_active/planning.md`
-   - `execution_docs/_active/execution.md`
+## Confirmed Baseline Decisions
 
-### File Update Order
+1. Debt disabled (`no negative balance` hard stop).
+2. Redis+DB outage policy is strict fail-closed.
+3. Reservation strategy is lease-only debit (no per-call upper-bound reserve).
+4. Tool failure after debit triggers full refund.
+5. `rate_id` is locked at request start.
+6. Lago ingestion granularity is per-step usage events.
+7. Cashfree credit minting occurs only on terminal success.
+8. LiteLLM is deployed on Modal with worker stack.
+9. Multi-org tenancy is enabled; active org is from JWT `active_org_id`.
+10. Topups are predefined packages with INR 100 minimum.
+11. IDs use UUIDv7.
+12. Lease key scope is `org_id`, TTL is 10 minutes, refill watermark is 20%.
+13. Lease refills occur on topup and automatic low-watermark checks.
+14. Outbox retries use 5s/30s/2m/10m/30m with max 8 attempts.
+15. Outbox workers run concurrently using `FOR UPDATE SKIP LOCKED`.
+16. Support/admin access is read-only with audit logging.
+17. Phase 1 settlement currency is INR only.
+18. Wallets are single-currency by org; mixed-currency balances are disallowed.
+19. Future FX/conversion happens at checkout layer, never in ledger math.
+20. Rate catalog and package catalog are static versioned config in v1.
+21. Pricing/package updates must be config-only edits (no code changes).
+22. Token accounting source of truth is LiteLLM usage only.
+23. Retention: webhook receipts 1 year, outbox history 90 days, admin audit 1 year.
 
-When behavior changes:
-
-1. `docs/DOMAIN_LOGIC.md`
-2. `docs/DATA_DICTIONARY.md`
-3. `docs/INTEGRATION_CONTRACTS.md`
-4. `docs/INFRASTRUCTURE.md` / `docs/SECURITY_ADVISORY.md` / `docs/OPERATIONAL_PLAYBOOK.md`
-5. Add or update ADR in `docs/DECISION_LOG/`
-
-### Prohibited Patterns
-
-- Undocumented architecture assumptions.
-- Silent catch-and-continue in critical mutation paths.
-- Provider/integration DTOs leaking into core domain logic.
-- Logging secrets or sensitive data.
-
-### Required Output Quality
-
-- Deterministic behavior for retries and replays.
-- Explicit error taxonomy and traceable failure handling.
-- Adequate tests for changed behavior.
-
-## Documentation Map (Significance-Ordered)
-
-1. [docs/SYSTEM_LANDSCAPE.md](docs/SYSTEM_LANDSCAPE.md): read first for architecture topology and boundaries.
-2. [docs/DOMAIN_LOGIC.md](docs/DOMAIN_LOGIC.md): read for core domain invariants and state rules.
-3. [docs/DATA_DICTIONARY.md](docs/DATA_DICTIONARY.md): read before changing schemas, payloads, or field names.
-4. [docs/INTEGRATION_CONTRACTS.md](docs/INTEGRATION_CONTRACTS.md): read for adapter interfaces and reliability expectations.
-5. [docs/SECURITY_ADVISORY.md](docs/SECURITY_ADVISORY.md): read for data handling, verification, and incident expectations.
-6. [docs/INFRASTRUCTURE.md](docs/INFRASTRUCTURE.md): read for runtime/deploy assumptions and environment contracts.
-7. [docs/ENGINEERING_STANDARDS.md](docs/ENGINEERING_STANDARDS.md): read for coding, validation, and testing standards.
-8. [docs/OPERATIONAL_PLAYBOOK.md](docs/OPERATIONAL_PLAYBOOK.md): read for deploy/rollback/recovery procedures.
-9. [docs/CODE_SEARCH.md](docs/CODE_SEARCH.md): read for code search patterns with `rg` and `ast-grep`.
-10. [docs/DECISION_LOG/README.md](docs/DECISION_LOG/README.md): read for ADR conventions and historical decisions.
-11. [execution_docs/_active/planning.md](execution_docs/_active/planning.md): current plan and decisions for active task.
-12. [execution_docs/_active/execution.md](execution_docs/_active/execution.md): real-time implementation tracker.
-
-## Archive Workflow
-
-- `.husky/post-commit` archives substantial active docs into `execution_docs/archive/` with `*-to-be-renamed.md`.
-- Next session must rename archived files to descriptive task names.
-- `.husky/pre-push` and CI both block push/merge while rename placeholders remain.
-
-## Finding Code
-
-- Use `rg` for text search.
-- Use `ast-grep` for structural/AST search.
-- Avoid plain `grep` unless `rg` is unavailable.
-
-```bash
-rg "TODO|FIXME" --type ts --type tsx
-ast-grep --pattern 'const $NAME = async ($$$) => { $$$ }'
-```
-
-See [docs/CODE_SEARCH.md](docs/CODE_SEARCH.md) for more examples.
-
-## Quick Commands
+## Fast Commands
 
 ```bash
 ./scripts/setup-hooks.sh

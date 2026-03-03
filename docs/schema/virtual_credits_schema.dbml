@@ -1,0 +1,183 @@
+Enum credit_ledger_type {
+  TOPUP
+  DEBIT_LLM
+  DEBIT_TOOL
+  REFUND
+  CHARGEBACK
+  ADJUSTMENT
+}
+
+Enum usage_outbox_status {
+  PENDING
+  PROCESSING
+  RETRY
+  SENT
+  FAILED
+}
+
+Enum payment_webhook_status {
+  RECEIVED
+  VERIFIED
+  PROCESSED
+  REJECTED
+}
+
+Enum org_role {
+  OWNER
+  ADMIN
+  MEMBER
+  SUPPORT_READONLY_ADMIN
+}
+
+Table org_wallet_settings {
+  org_id uuid [pk, note: '1 wallet settings row per org']
+  settlement_currency_code text [not null, note: 'Phase 1: INR only']
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  Note: 'Mutable table; one settlement currency per org wallet.'
+}
+
+Table org_memberships {
+  id uuid [pk, note: 'UUIDv7']
+  org_id uuid [not null]
+  user_id uuid [not null]
+  role org_role [not null]
+  created_at timestamptz [not null]
+
+  indexes {
+    (org_id, user_id) [unique, name: 'org_memberships_org_id_user_id_key']
+    (org_id) [name: 'org_memberships_org_id_idx']
+    (user_id) [name: 'org_memberships_user_id_idx']
+  }
+
+  Note: 'Mutable table.'
+}
+
+Table credit_packages {
+  id uuid [pk, note: 'UUIDv7']
+  code text [not null, unique]
+  currency_code text [not null]
+  amount_minor bigint [not null, note: 'INR paise in phase 1']
+  credits_micros bigint [not null, note: '1 credit = 1,000,000 micros']
+  is_active boolean [not null]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (code) [unique, name: 'credit_packages_code_key']
+  }
+
+  Note: 'Mutable table. Static versioned config source in v1.'
+}
+
+Table credit_ledger {
+  id uuid [pk, note: 'UUIDv7']
+  org_id uuid [not null]
+  user_id uuid
+  delta_micros bigint [not null]
+  type credit_ledger_type [not null]
+  idempotency_key text [not null]
+  run_id text
+  step_id text
+  trace_id text
+  rate_id text
+  metadata jsonb [not null]
+  created_at timestamptz [not null]
+
+  indexes {
+    (org_id, idempotency_key) [unique, name: 'credit_ledger_org_id_idempotency_key_key']
+    (org_id, created_at) [name: 'credit_ledger_org_created_idx']
+    (org_id, run_id, step_id) [name: 'credit_ledger_run_step_idx']
+    (trace_id) [name: 'credit_ledger_trace_idx']
+  }
+
+  Note: 'APPEND-ONLY source of financial truth.'
+}
+
+Table usage_outbox {
+  id uuid [pk, note: 'UUIDv7']
+  event_type text [not null]
+  payload jsonb [not null]
+  idempotency_key text [not null, unique]
+  status usage_outbox_status [not null]
+  attempts int [not null, note: '0..8']
+  next_retry_at timestamptz
+  last_error text
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (idempotency_key) [unique, name: 'usage_outbox_idempotency_key_key']
+    (status, next_retry_at, created_at) [name: 'usage_outbox_status_retry_idx']
+  }
+
+  Note: 'Mutable state machine for reliable delivery.'
+}
+
+Table payment_webhook_receipts {
+  id uuid [pk, note: 'UUIDv7']
+  org_id uuid [not null]
+  provider text [not null]
+  provider_event_id text [not null]
+  payload_hash text [not null]
+  status payment_webhook_status [not null]
+  created_at timestamptz [not null]
+
+  indexes {
+    (org_id, provider, provider_event_id) [unique, name: 'payment_webhook_receipts_org_id_provider_provider_event_id_key']
+    (created_at) [name: 'payment_webhook_receipts_created_idx']
+  }
+
+  Note: 'APPEND-ONLY receipt log for webhook idempotency and conflict detection.'
+}
+
+Table credit_leases {
+  org_id uuid [pk]
+  lease_micros bigint [not null]
+  expires_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  Note: 'Mutable visibility table mirroring Redis lease status.'
+}
+
+Table lago_customers {
+  org_id uuid [pk]
+  lago_customer_id text [not null, unique]
+  created_at timestamptz [not null]
+  updated_at timestamptz [not null]
+
+  indexes {
+    (org_id) [unique, name: 'lago_customers_org_id_key']
+    (lago_customer_id) [unique, name: 'lago_customers_lago_customer_id_key']
+  }
+
+  Note: 'Mutable one-to-one mapping; one Lago customer per org.'
+}
+
+Table admin_audit_log {
+  id uuid [pk, note: 'UUIDv7']
+  actor_user_id uuid [not null]
+  org_id uuid [not null]
+  action text [not null]
+  target_type text [not null]
+  target_id text
+  metadata jsonb [not null]
+  created_at timestamptz [not null]
+
+  indexes {
+    (org_id, created_at) [name: 'admin_audit_log_org_created_idx']
+    (actor_user_id, created_at) [name: 'admin_audit_log_actor_created_idx']
+  }
+
+  Note: 'APPEND-ONLY compliance log for support/admin reads.'
+}
+
+Ref: org_wallet_settings.org_id - org_memberships.org_id
+Ref: org_wallet_settings.org_id - credit_ledger.org_id
+Ref: org_wallet_settings.org_id - payment_webhook_receipts.org_id
+Ref: org_wallet_settings.org_id - credit_leases.org_id
+Ref: org_wallet_settings.org_id - lago_customers.org_id
+Ref: org_wallet_settings.org_id - admin_audit_log.org_id
+Ref: org_memberships.user_id - credit_ledger.user_id
+Ref: org_memberships.user_id - admin_audit_log.actor_user_id

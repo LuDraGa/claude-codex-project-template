@@ -10,6 +10,10 @@ Architecture Decision Records (ADRs) for this repository.
 - `####`: monotonic sequence (`0001`, `0002`, ...)
 - `short-title`: concise kebab-case summary
 
+## ADR Index
+
+- `2026-03-03-0001-ledger-outbox-and-lease-architecture.md` (Accepted)
+
 ## Required Sections
 
 - Context
