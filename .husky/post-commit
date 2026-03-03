@@ -30,15 +30,15 @@ has_substantial_content() {
   fi
 
   # Skip untouched templates; avoids archiving on every commit.
-  if grep -q "^## Task: \\[New Task Name\\]$\\|^## Task: \\[Task Name\\]$" "$file"; then
+  if grep -Eq "^## Task: \\[New Task Name\\]$|^## Task: \\[Task Name\\]$" "$file"; then
     return 1
   fi
 
-  if grep -q "✅ Completed\|🔄 In Progress\|### Completed Tasks" "$file"; then
+  if grep -Eq "✅ Completed|🔄 In Progress|### Completed Tasks" "$file"; then
     return 0
   fi
 
-  if grep -q "## Discussion Points\|## Execution Status\|### Proposed Approach" "$file"; then
+  if grep -Eq "## Discussion Points|## Execution Status|### Proposed Approach" "$file"; then
     return 0
   fi
 
