@@ -1,0 +1,28 @@
+name: Deploy Template
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: Target environment
+        required: true
+        type: choice
+        options:
+          - staging
+          - production
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Verify scaffold before deploy
+        run: ./scripts/verify-scaffold.sh
+
+      - name: Deploy (template placeholder)
+        run: |
+          echo "Implement deploy commands for ${{ inputs.environment }}"
+          echo "For example: build, migrate, deploy, and smoke checks"

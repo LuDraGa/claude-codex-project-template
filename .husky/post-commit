@@ -1,0 +1,195 @@
+#!/usr/bin/env sh
+. "$(dirname -- "$0")/_/husky.sh"
+
+# Post-commit hook to archive planning and execution documents.
+# This preserves session history while resetting active templates.
+
+# Prevent infinite loop if invoked recursively
+if [ -n "$HUSKY_POST_COMMIT_RUNNING" ]; then
+  exit 0
+fi
+export HUSKY_POST_COMMIT_RUNNING=1
+
+# Skip quietly if not a git repo
+if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+  exit 0
+fi
+
+COMMIT_HASH=$(git rev-parse --short HEAD)
+COMMIT_DATE=$(date +%Y-%m-%d)
+COMMIT_MSG=$(git log -1 --pretty=format:"%s")
+
+has_substantial_content() {
+  file="$1"
+  min_lines="$2"
+
+  if [ ! -f "$file" ] || [ ! -s "$file" ]; then
+    return 1
+  fi
+
+  lines=$(wc -l < "$file")
+  if [ "$lines" -lt "$min_lines" ]; then
+    return 1
+  fi
+
+  # Skip untouched templates
+  if grep -q "^## Task: \\[New Task Name\\]$\\|^## Task: \\[Task Name\\]$" "$file"; then
+    return 1
+  fi
+
+  if grep -q "✅ Completed\|🔄 In Progress\|### Completed Tasks" "$file"; then
+    return 0
+  fi
+
+  if grep -q "## Discussion Points\|## Execution Status\|### Proposed Approach" "$file"; then
+    return 0
+  fi
+
+  return 1
+}
+
+PLANNING_FILE="execution_docs/_active/planning.md"
+EXECUTION_FILE="execution_docs/_active/execution.md"
+PLANNING_ARCHIVE=""
+EXECUTION_ARCHIVE=""
+
+if has_substantial_content "$PLANNING_FILE" 10; then
+  mkdir -p execution_docs/archive
+  PLANNING_ARCHIVE="execution_docs/archive/${COMMIT_DATE}-${COMMIT_HASH}-planning-to-be-renamed.md"
+
+  cat > "$PLANNING_ARCHIVE" << ARCHIVE_HEADER
+---
+**Commit**: ${COMMIT_HASH}
+**Date**: $(date +"%Y-%m-%d %H:%M:%S")
+**Message**: ${COMMIT_MSG}
+---
+
+ARCHIVE_HEADER
+  cat "$PLANNING_FILE" >> "$PLANNING_ARCHIVE"
+
+  cat > "$PLANNING_FILE" << 'PLANNING_TEMPLATE'
+# Project - Active Planning
+
+## Task: [New Task Name]
+
+**Session**: [Date]
+**Context**: [Brief description of what needs to be planned]
+
+## Discussion Points
+
+### Current Situation
+*Describe the current state and what needs to be changed*
+
+### Proposed Approach
+*Outline the planned approach and alternatives considered*
+
+### Design Alternatives
+*List and compare different approaches considered*
+
+### Key Decisions
+*Document important decisions made during planning*
+
+### Dependencies & Considerations
+*Note any dependencies, constraints, or special considerations*
+
+### Success Criteria
+*How do we know this task is complete?*
+- [ ]
+- [ ]
+
+---
+
+*This document is actively edited during planning.*
+PLANNING_TEMPLATE
+
+  echo "Archived planning document: $PLANNING_ARCHIVE"
+fi
+
+if has_substantial_content "$EXECUTION_FILE" 15; then
+  mkdir -p execution_docs/archive
+  EXECUTION_ARCHIVE="execution_docs/archive/${COMMIT_DATE}-${COMMIT_HASH}-execution-to-be-renamed.md"
+
+  cat > "$EXECUTION_ARCHIVE" << ARCHIVE_HEADER
+---
+**Commit**: ${COMMIT_HASH}
+**Date**: $(date +"%Y-%m-%d %H:%M:%S")
+**Message**: ${COMMIT_MSG}
+---
+
+ARCHIVE_HEADER
+  cat "$EXECUTION_FILE" >> "$EXECUTION_ARCHIVE"
+
+  cat > "$EXECUTION_FILE" << 'EXECUTION_TEMPLATE'
+# Project - Active Execution
+
+## Task: [Task Name]
+
+**Session**: [Date]
+**Context**: [Brief description of what is being implemented]
+
+## Execution Status
+
+### Completed Tasks
+
+*None yet - starting implementation*
+
+### In Progress
+
+*None currently*
+
+### Pending Tasks
+
+*List tasks to be completed*
+
+## Changes Made
+
+### Files Modified
+-
+
+### Files Created
+-
+
+### Files Deleted
+-
+
+## Implementation Notes
+
+### Key Technical Details
+*Document important implementation decisions and technical details*
+
+### Challenges & Solutions
+*Note any challenges encountered and how they were resolved*
+
+## Testing Notes
+*Manual/automated testing performed and results*
+
+## Developer Actions Required
+- [ ] Run required checks/tests
+- [ ] Validate behavior manually
+
+---
+
+*This document tracks active implementation progress.*
+EXECUTION_TEMPLATE
+
+  echo "Archived execution document: $EXECUTION_ARCHIVE"
+fi
+
+if [ -n "$PLANNING_ARCHIVE" ] || [ -n "$EXECUTION_ARCHIVE" ]; then
+  echo "================================================================"
+  echo "POST-COMMIT: Documentation archived"
+  echo "Commit: $COMMIT_HASH on $COMMIT_DATE"
+  echo ""
+  echo "Archived files are unstaged; include them in your next commit:"
+  [ -n "$PLANNING_ARCHIVE" ] && echo "  - $PLANNING_ARCHIVE"
+  [ -n "$EXECUTION_ARCHIVE" ] && echo "  - $EXECUTION_ARCHIVE"
+  echo "  - $PLANNING_FILE (reset)"
+  echo "  - $EXECUTION_FILE (reset)"
+  echo ""
+  echo "Next agent session should rename archived files from *-to-be-renamed.md"
+  echo "Example: ${COMMIT_DATE}-${COMMIT_HASH}-planning-to-be-renamed.md"
+  echo "      -> ${COMMIT_DATE}-${COMMIT_HASH}-descriptive-task-name.md"
+  echo "================================================================"
+else
+  echo "No substantial content in active docs to archive"
+fi
